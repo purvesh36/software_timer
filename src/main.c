@@ -1,43 +1,49 @@
-/*
- * Copyright (c) 2016 Intel Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
- */
 
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/printk.h>
 
-/* 1000 msec = 1 sec */
-#define SLEEP_TIME_MS   1000
+/* Define two timers */
+static struct k_timer timer1;
+static struct k_timer timer2;
 
-/* The devicetree node identifier for the "led0" alias. */
-#define LED0_NODE DT_ALIAS(led0)
+/* Define a counter to track 30 seconds */
+static int counter = 0;
 
-/*
- * A build error on this line means your board is unsupported.
- * See the sample documentation for information on how to fix this.
- */
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-
-int main(void)
+/* Timer 1 callback function */
+void timer1_expiry_function(struct k_timer *timer_id)
 {
-	int ret;
+    printk("Timer 1 expired! Running function A... [%d sec]\n", counter + 1);
+    counter++;
 
-	if (!gpio_is_ready_dt(&led)) {
-		return 0;
-	}
+    /* After 30 seconds, stop Timer 1 and start Timer 2 */
+    if (counter >= 30)
+    {
+        printk("Stopping Timer 1 and starting Timer 2...\n");
+        k_timer_stop(&timer1);
+        k_timer_start(&timer2, K_NO_WAIT, K_SECONDS(2));
+    }
+}
 
-	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	if (ret < 0) {
-		return 0;
-	}
+/* Timer 2 callback function */
+void timer2_expiry_function(struct k_timer *timer_id)
+{
+    printk("Timer 2 expired! Running function B...\n");
+}
 
-	while (1) {
-		ret = gpio_pin_toggle_dt(&led);
-		if (ret < 0) {
-			return 0;
-		}
-		k_msleep(SLEEP_TIME_MS);
-	}
-	return 0;
+void main(void)
+{
+    printk("Starting controlled function timer example...\n");
+
+    /* Initialize the timers */
+    k_timer_init(&timer1, timer1_expiry_function, NULL);
+    
+    k_timer_init(&timer2, timer2_expiry_function, NULL);
+
+    /* Start Timer 1 immediately (fires every 1 second) */
+    k_timer_start(&timer1, K_NO_WAIT, K_SECONDS(1));
+
+    while (1)
+    {
+        k_sleep(K_FOREVER); /* Keep main thread alive */
+    }
 }
